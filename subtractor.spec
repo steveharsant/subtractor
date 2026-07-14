@@ -31,11 +31,22 @@ for _name in _ffmpeg_names:
 
 if _ffmpeg_found:
     print(f"  Bundling ffmpeg tools: {', '.join(_ffmpeg_found)}")
+elif os.name == "nt":
+    # On Windows, ffmpeg is almost never pre-installed. Refuse to build
+    # without it rather than producing a binary that will fail at runtime.
+    raise SystemExit(
+        "\n"
+        "  ERROR: ffmpeg\\ directory is missing or empty.\n"
+        "  ffmpeg.exe and ffprobe.exe are required to build on Windows.\n"
+        "\n"
+        "  Run this first:\n"
+        "    powershell -ExecutionPolicy Bypass -File scripts\\download-ffmpeg.ps1\n"
+        "\n"
+        "  Then build again."
+    )
 else:
     print("  WARNING: ffmpeg/ directory missing or empty — "
           "ffmpeg will NOT be bundled.")
-    print("  Run: powershell -ExecutionPolicy Bypass -File "
-          "scripts\\download-ffmpeg.ps1")
 
 a = Analysis(
     [
