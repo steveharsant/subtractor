@@ -16,7 +16,7 @@ Write-Host "==> Downloading ffmpeg essential build..."
 $TempDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
 try {
     $ZipPath = Join-Path $TempDir "ffmpeg.zip"
-    Invoke-WebRequest -Uri $FfmpegUrl -OutFile $ZipPath -RetryIntervalSec 5 -MaximumRetryCount 3
+    Invoke-WebRequest -Uri $FfmpegUrl -OutFile $ZipPath
 
     Write-Host "==> Extracting..."
     Expand-Archive -Path $ZipPath -DestinationPath $TempDir
