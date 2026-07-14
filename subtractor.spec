@@ -22,10 +22,20 @@ _ffmpeg_names = (
     ["ffmpeg.exe", "ffprobe.exe"] if os.name == "nt"
     else ["ffmpeg", "ffprobe"]
 )
+_ffmpeg_found = []
 for _name in _ffmpeg_names:
     _path = os.path.join(_ffmpeg_dir, _name)
     if os.path.isfile(_path):
         _bundled_binaries.append((_path, "."))
+        _ffmpeg_found.append(_name)
+
+if _ffmpeg_found:
+    print(f"  Bundling ffmpeg tools: {', '.join(_ffmpeg_found)}")
+else:
+    print("  WARNING: ffmpeg/ directory missing or empty — "
+          "ffmpeg will NOT be bundled.")
+    print("  Run: powershell -ExecutionPolicy Bypass -File "
+          "scripts\\download-ffmpeg.ps1")
 
 a = Analysis(
     [

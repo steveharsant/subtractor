@@ -1,4 +1,4 @@
-.PHONY: sync test run build build-linux build-windows build-windows-noconsole download-ffmpeg clean
+.PHONY: sync test run build build-linux build-windows build-windows-noconsole download-ffmpeg bundle clean
 
 sync:
 	uv sync --extra dev
@@ -13,8 +13,12 @@ run:
 download-ffmpeg:
 	bash scripts/download-ffmpeg.sh
 
+# Download ffmpeg + build (all-in-one).
+bundle: download-ffmpeg build
+
 # Build for the current platform (single-file executable, console visible).
-# Run 'make download-ffmpeg' first to bundle ffmpeg into the binary.
+# Run 'make download-ffmpeg' first to bundle ffmpeg into the binary,
+# or 'make bundle' to do both in one command.
 # Produces dist/subtractor on Linux, dist/subtractor.exe on Windows.
 build:
 	uv run --with pyinstaller pyinstaller subtractor.spec
