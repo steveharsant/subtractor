@@ -68,30 +68,48 @@ class ProbeResult:
 def find_ffmpeg_tool(name: str) -> str:
     """Resolve the path to *ffmpeg* or *ffprobe*.
 
-    Checks the PyInstaller bundle directory first (``sys._MEIPASS``), then
-    falls back to ``PATH``.  Raises :exc:`RuntimeError` if the tool cannot
-    be found.
-    """
-    # PyInstaller onefile bundle — tools may be shipped alongside the exe.
-    bundle_dir = getattr(sys, "_MEIPASS", None)
-    if bundle_dir:
-        candidate = os.path.join(bundle_dir, f"{name}.exe" if os.name == "nt" else name)
-        if os.path.isfile(candidate):
-            return candidate
+    Search order:
 
-    # Fall back to PATH.
-    resolved = name
-    if os.name == "nt":
-        # shutil.which prefers PATHEXT, but for clarity we also try .exe.
-        resolved = f"{name}.exe"
+    1. Same directory as the running executable (so ffmpeg can be placed
+       alongside the subtractor binary).
+    2. PyInstaller bundle directory (``sys._MEIPASS``).
+    3. Current working directory.
+    4. System ``PATH``.
+
+    Raises :exc:`RuntimeError` if the tool cannot be found.
+    """
+    exe_name = f"{name}.exe" if os.name == "nt" else name
 
     import shutil
 
-    path = shutil.which(resolved)
+    # Search directories in priority order.
+    search_dirs: list[str] = []
+
+    # 1. Directory containing the running executable.
+    exe_dir = os.path.dirname(sys.executable)
+    if exe_dir:
+        search_dirs.append(exe_dir)
+
+    # 2. PyInstaller one-file bundle extraction directory.
+    bundle_dir = getattr(sys, "_MEIPASS", None)
+    if bundle_dir:
+        search_dirs.append(bundle_dir)
+
+    # 3. Current working directory.
+    search_dirs.append(os.getcwd())
+
+    for directory in search_dirs:
+        candidate = os.path.join(directory, exe_name)
+        if os.path.isfile(candidate):
+            return candidate
+
+    # 4. Fall back to PATH.
+    path = shutil.which(exe_name)
     if path is None:
         raise RuntimeError(
-            f"{name} not found on PATH. Please install ffmpeg and ensure "
-            f"ffmpeg.exe and ffprobe.exe are accessible."
+            f"{name} not found. Place {exe_name} alongside the subtractor "
+            f"binary, in the current directory, or on your system PATH. "
+            f"Download from https://ffmpeg.org/download.html"
         )
     return path
 

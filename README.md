@@ -96,6 +96,26 @@ The output is `dist/subtractor` on Linux, `dist/subtractor.exe` on Windows.
 
 To reduce the executable size further, install [UPX](https://upx.github.io/) before building — PyInstaller will use it automatically when the `upx=True` option is set in the spec file.
 
+### Bundling ffmpeg (optional)
+
+You can embed ffmpeg and ffprobe directly into the subtractor binary so users
+don't need to install them separately.
+
+**Linux / macOS:**
+```bash
+make download-ffmpeg   # or: bash scripts/download-ffmpeg.sh
+make build
+```
+
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\download-ffmpeg.ps1
+uv run --with pyinstaller pyinstaller subtractor.spec
+```
+
+The scripts download static ffmpeg builds and place them in the `ffmpeg/`
+directory, where the PyInstaller spec picks them up automatically.
+
 ## Development
 
 ```bash

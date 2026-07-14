@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 from unittest import mock
 
@@ -455,7 +457,14 @@ class TestFindFfmpegTool:
         with mock.patch("shutil.which", return_value="/usr/bin/ffmpeg"):
             assert find_ffmpeg_tool("ffmpeg") == "/usr/bin/ffmpeg"
 
+    def test_finds_next_to_executable(self) -> None:
+        exe_dir = os.path.dirname(sys.executable)
+        fake_path = os.path.join(exe_dir, "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+        with mock.patch("os.path.isfile", side_effect=lambda p: p == fake_path):
+            result = find_ffmpeg_tool("ffmpeg")
+            assert result == fake_path
+
     def test_raises_when_not_found(self) -> None:
         with mock.patch("shutil.which", return_value=None):
-            with pytest.raises(RuntimeError, match="not found on PATH"):
+            with pytest.raises(RuntimeError, match="not found"):
                 find_ffmpeg_tool("ffmpeg")

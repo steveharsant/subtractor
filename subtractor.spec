@@ -8,12 +8,24 @@ block_cipher = None
 # Bundle Tcl/Tk shared libraries so the binary runs on systems without
 # Tcl/Tk 9.0 installed (Python 3.14+ requires Tcl/Tk 9).
 _python_lib = sysconfig.get_config_var("LIBDIR")
-_tcl_binaries = []
+_bundled_binaries = []
 if _python_lib:
     for _so in ("libtcl9.0.so", "libtcl9tk9.0.so"):
         _path = os.path.join(_python_lib, _so)
         if os.path.isfile(_path):
-            _tcl_binaries.append((_path, "."))
+            _bundled_binaries.append((_path, "."))
+
+# Bundle ffmpeg and ffprobe if present in a "ffmpeg/" directory next to
+# this spec file (look for platform-appropriate names).
+_ffmpeg_dir = os.path.join(SPECPATH, "ffmpeg")
+_ffmpeg_names = (
+    ["ffmpeg.exe", "ffprobe.exe"] if os.name == "nt"
+    else ["ffmpeg", "ffprobe"]
+)
+for _name in _ffmpeg_names:
+    _path = os.path.join(_ffmpeg_dir, _name)
+    if os.path.isfile(_path):
+        _bundled_binaries.append((_path, "."))
 
 a = Analysis(
     [
@@ -23,7 +35,7 @@ a = Analysis(
         os.path.join("subtractor", "gui.py"),
     ],
     pathex=[SPECPATH],
-    binaries=_tcl_binaries,
+    binaries=_bundled_binaries,
     datas=[],
     hiddenimports=[],
     hookspath=[],

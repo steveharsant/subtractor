@@ -9,7 +9,7 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 
 from subtractor import __version__
-from subtractor.core import extract_all, is_text_subtitle, probe_video
+from subtractor.core import extract_all, find_ffmpeg_tool, is_text_subtitle, probe_video
 
 VIDEO_EXTENSIONS: frozenset[str] = frozenset({
     ".mkv", ".mp4", ".avi", ".mov", ".wmv", ".m4v", ".ts", ".mts", ".m2ts", ".ogm",
@@ -249,8 +249,25 @@ class SubtractorApp:
 
     # -- Internal helpers ---------------------------------------------------
 
+    def _check_ffmpeg(self) -> bool:
+        """Return True if ffprobe/ffmpeg are on PATH, show warning if not."""
+        try:
+            find_ffmpeg_tool("ffprobe")
+            return True
+        except RuntimeError as e:
+            messagebox.showwarning(
+                "ffmpeg not found",
+                f"{e}\n\n"
+                "Download ffmpeg from https://ffmpeg.org/download.html\n"
+                "and ensure ffmpeg.exe and ffprobe.exe are on your PATH.",
+            )
+            return False
+
     def _append_files(self, paths: list[Path]) -> None:
         if not paths:
+            return
+
+        if not self._check_ffmpeg():
             return
 
         existing = {p.resolve() for p, _ in self._files}
@@ -272,8 +289,13 @@ class SubtractorApp:
         """Probe the file and return a display label showing subtitle info."""
         try:
             probe = probe_video(path)
-        except Exception:
-            return f"{path.name}  [probe failed]"
+        except RuntimeError as exc:
+            msg = str(exc)
+            if "not found on PATH" in msg:
+                return f"{path.name}  [ffmpeg/ffprobe not found on PATH]"
+            return f"{path.name}  [probe failed: {msg}]"
+        except Exception as exc:
+            return f"{path.name}  [probe failed: {exc}]"
 
         if not probe.streams:
             return f"{path.name}  [no text subtitles]"
