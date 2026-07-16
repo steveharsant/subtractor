@@ -258,7 +258,7 @@ def extract_subtitle(
         ffmpeg_bin,
         "-y",
         "-i", str(video_path),
-        "-map", f"0:s:{stream.index}",
+        "-map", f"0:{stream.index}",
         "-f", "srt",
         str(output_path),
     ]

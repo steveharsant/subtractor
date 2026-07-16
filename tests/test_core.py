@@ -310,7 +310,7 @@ class TestExtractSubtitle:
         assert "-i" in cmd
         assert str(VIDEO_PATH) in cmd
         assert "-map" in cmd
-        assert "0:s:2" in cmd
+        assert "0:2" in cmd
         assert "-f" in cmd
         assert "srt" in cmd
         assert str(output) in cmd
