@@ -12,6 +12,9 @@ services:
       SUBTRACTOR_RETENTION_DAYS: "14"
       # Set to "true" when serving over HTTPS (e.g. behind a reverse proxy).
       SUBTRACTOR_SECURE_COOKIES: "false"
+      # "auto" picks the Whisper model from the CPUs/RAM available to the container.
+      SUBTRACTOR_WHISPER_MODEL: ${SUBTRACTOR_WHISPER_MODEL:-auto}
+      SUBTRACTOR_WHISPER_LANGUAGE: ${SUBTRACTOR_WHISPER_LANGUAGE:-auto}
     volumes:
       - subtractor-data:/data
     restart: unless-stopped

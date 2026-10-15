@@ -34,8 +34,34 @@ type VideoMeta struct {
 	ExpiresAt  time.Time        `json:"expiresAt"`
 	Streams    []SubtitleStream `json:"streams"`
 	StoredName string           `json:"storedName"` // filename of the video inside its directory
+
+	Transcript   *TranscriptInfo `json:"transcript,omitempty"`   // Whisper speech-to-text state, nil if never requested
+	CollectionID string          `json:"collectionId,omitempty"` // set when the video is a part of a combined transcript
 }
 
+// TranscriptInfo tracks a Whisper transcription of a video's audio.
+type TranscriptInfo struct {
+	Status    string    `json:"status"`   // queued, running, done, error
+	Progress  int       `json:"progress"` // 0-100
+	Error     string    `json:"error,omitempty"`
+	Model     string    `json:"model,omitempty"`
+	Language  string    `json:"language,omitempty"` // language whisper detected or was told to use
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+const (
+	transcriptQueued  = "queued"
+	transcriptRunning = "running"
+	transcriptDone    = "done"
+	transcriptError   = "error"
+)
+
+// pending reports whether the transcript is waiting for or undergoing work.
+func (t *TranscriptInfo) pending() bool {
+	return t != nil && (t.Status == transcriptQueued || t.Status == transcriptRunning)
+}
+
+// IDs for videos and collections share one format.
 var videoIDPattern = regexp.MustCompile(`^[a-f0-9]{24}$`)
 
 func newVideoID() string {
@@ -87,6 +113,23 @@ func saveMeta(dir string, meta *VideoMeta) error {
 		return err
 	}
 	return os.Rename(tmp, metaPath(dir))
+}
+
+// updateMeta applies fn to a video's metadata under the app-wide metadata
+// lock, so the transcription worker and request handlers never lose each
+// other's writes.
+func (app *App) updateMeta(dir string, fn func(*VideoMeta)) (*VideoMeta, error) {
+	app.metaMu.Lock()
+	defer app.metaMu.Unlock()
+	meta, err := loadMeta(dir)
+	if err != nil {
+		return nil, err
+	}
+	fn(meta)
+	if err := saveMeta(dir, meta); err != nil {
+		return nil, err
+	}
+	return meta, nil
 }
 
 // listVideos returns metadata for all stored videos, newest first.

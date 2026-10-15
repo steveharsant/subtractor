@@ -61,6 +61,7 @@ func (app *App) handleUpload(w http.ResponseWriter, r *http.Request) {
 	cleanup := func() { os.RemoveAll(dir) }
 
 	var meta *VideoMeta
+	transcribe := false
 	for {
 		part, err := mr.NextPart()
 		if err == io.EOF {
@@ -74,6 +75,12 @@ func (app *App) handleUpload(w http.ResponseWriter, r *http.Request) {
 			}
 			writeError(w, http.StatusBadRequest, "malformed upload")
 			return
+		}
+		if part.FormName() == "transcribe" {
+			// Must precede the file field in the form.
+			v, _ := io.ReadAll(io.LimitReader(part, 8))
+			transcribe = string(v) == "1" || string(v) == "true"
+			continue
 		}
 		if part.FormName() != "file" {
 			continue
@@ -136,6 +143,11 @@ func (app *App) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("uploaded %s (%s, %d bytes, %d subtitle streams)", meta.ID, meta.Filename, meta.Size, len(meta.Streams))
+	if transcribe && app.whisper.Available() {
+		if queued, err := app.requestTranscript(dir); err == nil {
+			meta = queued
+		}
+	}
 	writeJSON(w, http.StatusCreated, meta)
 }
 
@@ -163,16 +175,26 @@ func (app *App) handleGetVideo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
-	dir, err := app.videoDir(r.PathValue("id"))
-	if err != nil {
+	id := r.PathValue("id")
+	if _, err := app.videoDir(id); err != nil {
 		writeError(w, http.StatusNotFound, "video not found")
 		return
 	}
-	if err := os.RemoveAll(dir); err != nil {
+	if err := app.deleteVideo(id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete video")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// deleteVideo stops any transcription of the video, then removes its files.
+func (app *App) deleteVideo(id string) error {
+	dir, err := app.videoDir(id)
+	if err != nil {
+		return nil // already gone
+	}
+	app.transcriber.Cancel(id)
+	return os.RemoveAll(dir)
 }
 
 // resolveStream validates that the requested stream index is a known,
@@ -227,6 +249,10 @@ func (app *App) handleExtract(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) handleDownload(w http.ResponseWriter, r *http.Request) {
+	format, ok := downloadFormat(w, r)
+	if !ok {
+		return
+	}
 	dir, err := app.videoDir(r.PathValue("id"))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "video not found")
@@ -243,12 +269,6 @@ func (app *App) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	format := r.URL.Query().Get("format")
-	if format != "srt" && format != "txt" {
-		writeError(w, http.StatusBadRequest, "format must be srt or txt")
-		return
-	}
-
 	srtPath, err := extractSubtitle(dir, meta.StoredName, stream.Index)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -259,19 +279,34 @@ func (app *App) handleDownload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to read extracted subtitles")
 		return
 	}
-	if format == "txt" {
-		content = []byte(srtToPlainText(string(content)))
-	}
 
 	base := strings.TrimSuffix(meta.Filename, filepath.Ext(meta.Filename))
 	label := stream.Language
 	if label == "" {
 		label = fmt.Sprintf("stream%d", stream.Index)
 	}
-	downloadName := fmt.Sprintf("%s.%s.%s", base, label, format)
+	sendSubtitles(w, base+"."+label, format, string(content))
+}
 
+// downloadFormat validates the ?format= query parameter of a download.
+func downloadFormat(w http.ResponseWriter, r *http.Request) (string, bool) {
+	format := r.URL.Query().Get("format")
+	if format != "srt" && format != "txt" {
+		writeError(w, http.StatusBadRequest, "format must be srt or txt")
+		return "", false
+	}
+	return format, true
+}
+
+// sendSubtitles writes SRT content as an attachment, converting it to plain
+// text first when format is "txt".
+func sendSubtitles(w http.ResponseWriter, baseName, format, srt string) {
+	content := srt
+	if format == "txt" {
+		content = srtToPlainText(srt)
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", downloadName))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", baseName+"."+format))
 	w.Header().Set("Content-Length", strconv.Itoa(len(content)))
-	w.Write(content)
+	w.Write([]byte(content))
 }

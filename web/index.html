@@ -33,21 +33,40 @@
 
     <main>
       <section id="upload-section">
-        <div id="dropzone" tabindex="0" role="button" aria-label="Upload a video file">
+        <div id="dropzone" tabindex="0" role="button" aria-label="Choose video files to upload">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
             <path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke-linecap="round"/>
           </svg>
-          <p><strong>Drop a video here</strong> or click to browse</p>
-          <p class="muted">The file is analysed for embedded subtitle tracks</p>
-          <input type="file" id="file-input" accept="video/*,.mkv,.mp4,.avi,.mov,.webm,.ts,.m2ts" hidden>
+          <p><strong>Drop videos here</strong> or click to browse</p>
+          <p class="muted">Extract embedded subtitle tracks, or transcribe the audio with Whisper</p>
+          <input type="file" id="file-input" accept="video/*,audio/*,.mkv,.mp4,.avi,.mov,.webm,.ts,.m2ts" multiple hidden>
         </div>
+
+        <div id="pending" class="hidden">
+          <h3>Ready to upload</h3>
+          <ol id="pending-list"></ol>
+          <div class="options">
+            <label class="check"><input type="checkbox" id="opt-transcribe"> Generate a transcript with Whisper</label>
+            <label class="check" id="opt-combine-row"><input type="checkbox" id="opt-combine"> Combine all files into a single transcript, in the order above</label>
+            <div id="combine-name-row" class="hidden">
+              <label for="combine-name" class="muted">Transcript name</label>
+              <input type="text" id="combine-name" maxlength="200" placeholder="e.g. Lecture 3">
+            </div>
+          </div>
+          <div class="pending-actions">
+            <button id="pending-upload">Upload</button>
+            <button id="pending-clear" class="ghost">Clear</button>
+          </div>
+        </div>
+
         <div id="upload-progress" class="hidden">
           <div class="progress-track"><div id="progress-bar" class="progress-fill"></div></div>
           <p id="upload-status" class="muted"></p>
           <button id="upload-cancel" class="ghost">Cancel</button>
         </div>
         <p id="upload-error" class="error hidden"></p>
+        <p id="whisper-status" class="muted whisper-status"></p>
       </section>
 
       <section id="detail-section" class="hidden">
@@ -62,9 +81,19 @@
           </div>
         </div>
 
-        <h3>Subtitle tracks</h3>
-        <ul id="stream-list"></ul>
-        <p id="no-streams" class="muted hidden">No embedded subtitle tracks were found in this file.</p>
+        <h3>Whisper transcript</h3>
+        <div id="transcript-block" class="transcript-block"></div>
+
+        <div id="parts-block" class="hidden">
+          <h3>Parts</h3>
+          <ol id="part-list"></ol>
+        </div>
+
+        <div id="streams-block">
+          <h3>Embedded subtitle tracks</h3>
+          <ul id="stream-list"></ul>
+          <p id="no-streams" class="muted hidden">No embedded subtitle tracks were found in this file.</p>
+        </div>
 
         <div id="result-panel" class="hidden">
           <div class="result-header">

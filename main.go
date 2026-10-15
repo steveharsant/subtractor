@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -24,6 +25,10 @@ type App struct {
 	retention      time.Duration
 	secureCookies  bool
 	loginLimiter   *LoginLimiter
+
+	metaMu      sync.Mutex // serialises meta.json read-modify-write cycles
+	whisper     *Whisper
+	transcriber *Transcriber
 }
 
 func envOr(key, fallback string) string {
@@ -81,9 +86,20 @@ func main() {
 
 	app.secureCookies = envOr("SUBTRACTOR_SECURE_COOKIES", "false") == "true"
 
-	if err := os.MkdirAll(app.videosDir(), 0o750); err != nil {
-		log.Fatalf("failed to create data directory: %v", err)
+	for _, dir := range []string{app.videosDir(), app.collectionsDir()} {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			log.Fatalf("failed to create data directory: %v", err)
+		}
 	}
+
+	app.whisper, err = NewWhisper(app.dataDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	app.whisper.Start() // downloads the model in the background on first run
+	app.transcriber = NewTranscriber(app)
+	app.transcriber.Resume()
+	go app.transcriber.Run()
 
 	go app.retentionSweeper()
 
@@ -97,6 +113,16 @@ func main() {
 	mux.HandleFunc("DELETE /api/videos/{id}", app.requireAuth(app.handleDeleteVideo))
 	mux.HandleFunc("POST /api/videos/{id}/extract/{stream}", app.requireAuth(app.handleExtract))
 	mux.HandleFunc("GET /api/videos/{id}/download/{stream}", app.requireAuth(app.handleDownload))
+	mux.HandleFunc("POST /api/videos/{id}/transcribe", app.requireAuth(app.handleTranscribe))
+	mux.HandleFunc("GET /api/videos/{id}/transcript", app.requireAuth(app.handleGetTranscript))
+	mux.HandleFunc("GET /api/videos/{id}/transcript/download", app.requireAuth(app.handleDownloadTranscript))
+	mux.HandleFunc("GET /api/whisper", app.requireAuth(app.handleWhisperStatus))
+	mux.HandleFunc("POST /api/collections", app.requireAuth(app.handleCreateCollection))
+	mux.HandleFunc("GET /api/collections", app.requireAuth(app.handleListCollections))
+	mux.HandleFunc("GET /api/collections/{id}", app.requireAuth(app.handleGetCollection))
+	mux.HandleFunc("DELETE /api/collections/{id}", app.requireAuth(app.handleDeleteCollection))
+	mux.HandleFunc("GET /api/collections/{id}/transcript", app.requireAuth(app.handleGetCollectionTranscript))
+	mux.HandleFunc("GET /api/collections/{id}/download", app.requireAuth(app.handleDownloadCollection))
 
 	staticFS, err := fs.Sub(webFS, "web")
 	if err != nil {
@@ -163,10 +189,32 @@ func (app *App) sweepExpired() {
 		}
 		if uploaded.Before(cutoff) {
 			dir := filepath.Join(app.videosDir(), e.Name())
+			app.transcriber.Cancel(e.Name())
 			if err := os.RemoveAll(dir); err != nil {
 				log.Printf("retention sweep: failed to remove %s: %v", dir, err)
 			} else {
 				log.Printf("retention sweep: removed expired video %s (uploaded %s)", e.Name(), uploaded.Format(time.RFC3339))
+			}
+		}
+	}
+
+	// Collections expire with their parts; also drop ones whose parts are all gone.
+	collections, err := app.listCollections()
+	if err != nil {
+		return
+	}
+	for _, c := range collections {
+		alive := 0
+		for _, id := range c.VideoIDs {
+			if _, err := app.videoDir(id); err == nil {
+				alive++
+			}
+		}
+		if c.ExpiresAt.Before(time.Now()) || alive == 0 {
+			if err := app.deleteCollection(c); err != nil {
+				log.Printf("retention sweep: failed to remove collection %s: %v", c.ID, err)
+			} else {
+				log.Printf("retention sweep: removed collection %s (%q)", c.ID, c.Name)
 			}
 		}
 	}

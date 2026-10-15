@@ -142,6 +142,31 @@ section {
   transition: width 0.15s;
 }
 
+#pending { margin-top: 1rem; }
+#pending h3 { margin-top: 0; }
+#pending-list, #part-list { margin: 0; padding: 0 0 0 1.5rem; }
+#pending-list li { padding: 0.3rem 0; }
+#pending-list li > * { vertical-align: middle; }
+.pending-name { font-weight: 600; margin-right: 0.5rem; overflow-wrap: anywhere; }
+.pending-buttons { display: inline-flex; gap: 0.25rem; margin-left: 0.5rem; }
+button.icon { padding: 0.1rem 0.5rem; font-size: 0.85rem; line-height: 1.4; }
+.options { display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0; }
+.check { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 1rem; height: 1rem; }
+#combine-name-row { display: flex; flex-direction: column; gap: 0.25rem; padding-left: 1.5rem; max-width: 420px; }
+#combine-name {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+}
+#combine-name:focus { outline: none; border-color: var(--accent); }
+.pending-actions { display: flex; gap: 0.5rem; }
+.whisper-status { margin: 1rem 0 0; }
+.whisper-status:empty { display: none; }
+
 /* ---- Detail / streams ---- */
 .detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .detail-actions { display: flex; gap: 0.5rem; }
@@ -172,6 +197,24 @@ section {
 }
 .badge.lang { border-color: var(--accent); color: var(--accent); }
 .badge.warn { border-color: var(--danger); color: var(--danger); }
+.badge.status-running, .badge.status-queued { border-color: var(--accent); color: var(--accent); }
+.badge.status-done { border-color: var(--success); color: var(--success); }
+.badge.status-error, .badge.status-missing { border-color: var(--danger); color: var(--danger); }
+.video-info .badges { margin-top: 0.25rem; }
+
+/* ---- Transcript ---- */
+.transcript-block { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+.transcript-block p { margin: 0; }
+.transcript-block .progress-track { width: 100%; flex: none; }
+#part-list li {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.5rem;
+  background: var(--surface-2);
+}
+#part-list li::marker { color: var(--muted); }
+#part-list .error { margin: 0.25rem 0 0; }
 
 /* ---- Result ---- */
 .result-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
